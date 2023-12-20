@@ -947,6 +947,7 @@ m_bIrrigation(false),
 m_bIgnoreIrrigation(false),
 m_bWaterWork(false),
 m_bRiverTrade(false),
+m_bLanguage(false),
 // Dale - AB: Bombing START
 m_bDCMAirBombTech1(0),
 m_bDCMAirBombTech2(0),
@@ -1460,6 +1461,7 @@ bool CvTechInfo::read(CvXMLLoadUtility* pXML)
 	pXML->GetOptionalChildXmlValByName(&m_bIgnoreIrrigation, L"bIgnoreIrrigation");
 	pXML->GetOptionalChildXmlValByName(&m_bWaterWork, L"bWaterWork");
 	pXML->GetOptionalChildXmlValByName(&m_bRiverTrade, L"bRiverTrade");
+	pXML->GetOptionalChildXmlValByName(&m_bLanguage, L"bLanguage");
 	pXML->GetOptionalChildXmlValByName(&m_iGridX, L"iGridX");
 	pXML->GetOptionalChildXmlValByName(&m_iGridY, L"iGridY");
 	pXML->GetOptionalChildXmlValByName(&m_bDCMAirBombTech1, L"bDCMAirBombTech1");
@@ -1616,6 +1618,7 @@ void CvTechInfo::copyNonDefaults(const CvTechInfo* pClassInfo)
 	if (isIgnoreIrrigation() == bDefault) m_bIgnoreIrrigation = pClassInfo->isIgnoreIrrigation();
 	if (isWaterWork() == bDefault) m_bWaterWork = pClassInfo->isWaterWork();
 	if (isRiverTrade() == bDefault) m_bRiverTrade = pClassInfo->isRiverTrade();
+	if (m_bLanguage == bDefault) m_bLanguage = pClassInfo->isLanguage();
 
 	if (getGridX() == iDefault) m_iGridX = pClassInfo->getGridX();
 	if (getGridY() == iDefault) m_iGridY = pClassInfo->getGridY();
@@ -1789,6 +1792,7 @@ void CvTechInfo::getCheckSum(uint32_t& iSum) const
 	CheckSum(iSum, m_bIgnoreIrrigation);
 	CheckSum(iSum, m_bWaterWork);
 	CheckSum(iSum, m_bRiverTrade);
+	CheckSum(iSum, m_bLanguage);
 
 	CheckSum(iSum, m_piDomainExtraMoves, NUM_DOMAIN_TYPES);
 	CheckSum(iSum, m_piFlavorValue, GC.getNumFlavorTypes());
@@ -2093,7 +2097,8 @@ m_bStatus(false),
 m_bPrereqNormInvisible(false),
 m_bPlotPrereqsKeepAfter(false),
 m_bRemoveAfterSet(false),
-m_bQuick(false)
+m_bQuick(false),
+m_bStarsign(false)
 //TB Combat Mods End
 {
 	CvInfoUtil(this).initDataMembers();
@@ -4980,6 +4985,7 @@ bool CvPromotionInfo::read(CvXMLLoadUtility* pXML)
 	pXML->GetOptionalChildXmlValByName(&m_bPlotPrereqsKeepAfter, L"bPlotPrereqsKeepAfter");
 	pXML->GetOptionalChildXmlValByName(&m_bRemoveAfterSet, L"bRemoveAfterSet");
 	pXML->GetOptionalChildXmlValByName(&m_bQuick, L"bQuick");
+	pXML->GetOptionalChildXmlValByName(&m_bStarsign, L"bStarsign");
 	//pXML->SetVariableListTagPair(&m_piAIWeightbyUnitCombatTypes, L"AIWeightbyUnitCombatTypes", GC.getNumUnitCombatInfos());
 	pXML->SetOptionalVector(&m_aiSubCombatChangeTypes, L"SubCombatChangeTypes");
 	pXML->SetOptionalVector(&m_aiRemovesUnitCombatTypes, L"RemovesUnitCombatTypes");
@@ -5758,6 +5764,7 @@ void CvPromotionInfo::copyNonDefaults(const CvPromotionInfo* pClassInfo)
 	if (isPlotPrereqsKeepAfter() == bDefault) m_bPlotPrereqsKeepAfter = pClassInfo->isPlotPrereqsKeepAfter();
 	if (isRemoveAfterSet() == bDefault) m_bRemoveAfterSet = pClassInfo->isRemoveAfterSet();
 	if (isQuick() == bDefault) m_bQuick = pClassInfo->isQuick();
+	if (m_bStarsign == false) m_bStarsign = pClassInfo->isStarsign();
 	// bool vectors without delayed resolution
 	if (getNumSubCombatChangeTypes() == 0)
 	{
@@ -6438,6 +6445,7 @@ void CvPromotionInfo::getCheckSum(uint32_t& iSum) const
 	CheckSum(iSum, m_bPlotPrereqsKeepAfter);
 	CheckSum(iSum, m_bRemoveAfterSet);
 	CheckSum(iSum, m_bQuick);
+	CheckSum(iSum, m_bStarsign);
 	CheckSum(iSum, m_bZeroesXP);
 	CheckSum(iSum, m_bForOffset);
 	CheckSum(iSum, m_bCargoPrereq);
@@ -6965,6 +6973,7 @@ int CvActionInfo::getMissionData() const
 		case ACTIONSUBTYPE_CORPORATION:
 		case ACTIONSUBTYPE_SPECIALIST:
 		case ACTIONSUBTYPE_BUILDING:
+		case ACTIONSUBTYPE_HERITAGE:
 			return m_iOriginalIndex;
 	}
 	return -1;
@@ -7028,6 +7037,9 @@ int CvActionInfo::getMissionType() const
 
 		case ACTIONSUBTYPE_BUILDING:
 			return GC.getBuildingInfo((BuildingTypes)m_iOriginalIndex).getMissionType();
+
+		case ACTIONSUBTYPE_HERITAGE:
+			return GC.getHeritageInfo((HeritageTypes)m_iOriginalIndex).getMissionType();
 
 		case ACTIONSUBTYPE_MISSION:
 			return m_iOriginalIndex;
@@ -7139,6 +7151,9 @@ const CvHotkeyInfo* CvActionInfo::getHotkeyInfo() const
 
 		case ACTIONSUBTYPE_BUILDING:
 			return &GC.getBuildingInfo((BuildingTypes)getOriginalIndex());
+
+		case ACTIONSUBTYPE_HERITAGE:
+			return &GC.getHeritageInfo((HeritageTypes)getOriginalIndex());
 
 		case ACTIONSUBTYPE_CONTROL:
 			return &GC.getControlInfo((ControlTypes)getOriginalIndex());
@@ -26439,7 +26454,6 @@ void CvPromotionLineInfo::doPostLoadCaching(uint32_t iThis)
 			m_aiBuildings.push_back(i);
 		}
 	}
-
 }
 
 TechTypes CvPromotionLineInfo::getObsoleteTech() const
