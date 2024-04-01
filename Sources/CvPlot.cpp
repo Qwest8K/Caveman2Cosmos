@@ -711,7 +711,7 @@ bool CvPlot::doBonusDiscovery()
 	const int iNumBonuses = GC.getNumMapBonuses();
 	// Toffer - Can't check all bonuses for all valid plots every turn
 	//	bWorked is more likely to be true for plots in late game, which is when optimization is most dire.
-	int iMaxAttempts = bWorked ? 20 : 50;
+	int iMaxAttempts = bWorked ? 15 : 45;
 	int iAttempts = 0;
 	int iIndex = game.getSorenRandNum(iNumBonuses, "Random start index");
 	int iCount = 0;
@@ -729,6 +729,13 @@ bool CvPlot::doBonusDiscovery()
 		else if (bWorked)
 		{
 			iOdds = 40000; // small chance always there when worked by city.
+		}
+		else
+		{
+			// Toffer: we won't go through all map bonuses if it is an unworked tile, limiting it makes sense.
+			//	Some improvements don't have any discovery chances... this should be cached on game launch
+			//		so we don't have to loop even the limited set for those improvements.
+			iAttempts++;
 		}
 
 		if (iOdds > 0 && team.isHasTech((TechTypes)GC.getBonusInfo(eBonus).getTechReveal()) && canHaveBonus(eBonus))
@@ -774,7 +781,7 @@ bool CvPlot::doBonusDiscovery()
 				}
 				return true;
 			}
-			if (bImpBonus)
+			if (!bWorked && bImpBonus)
 			{
 				return false;
 			}
@@ -3954,6 +3961,7 @@ int CvPlot::defenseModifier(TeamTypes eDefender, bool bIgnoreBuilding, bool bHel
 	FAssertMsg(getTerrainType() != NO_TERRAIN, "TerrainType is not assigned a valid value");
 
 	int iModifier = GC.getTerrainInfo(getTerrainType()).getDefenseModifier();
+
 	if (getFeatureType() != NO_FEATURE)
 	{
 		iModifier += GC.getFeatureInfo(getFeatureType()).getDefenseModifier();
@@ -3968,28 +3976,27 @@ int CvPlot::defenseModifier(TeamTypes eDefender, bool bIgnoreBuilding, bool bHel
 		iModifier += GC.getPEAK_EXTRA_DEFENSE();
 	}
 
-	ImprovementTypes eImprovement;
-	if (bHelp)
 	{
-		eImprovement = getRevealedImprovementType(GC.getGame().getActiveTeam(), false);
-	}
-	else
-	{
-		eImprovement = getImprovementType();
-	}
-
-	if (eImprovement != NO_IMPROVEMENT && eDefender != NO_TEAM
-	&& (getTeam() == NO_TEAM || GET_TEAM(eDefender).isFriendlyTerritory(getTeam())))
-	{
-		// Super Forts begin *bombard*
-		iModifier += GC.getImprovementInfo(eImprovement).getDefenseModifier() - getDefenseDamage();
+		const ImprovementTypes eImprovement = (
+			bHelp
+			?
+			getRevealedImprovementType(GC.getGame().getActiveTeam())
+			:
+			getImprovementType()
+		);
+		if (eImprovement != NO_IMPROVEMENT && eDefender != NO_TEAM
+		&& (getTeam() == NO_TEAM || GET_TEAM(eDefender).isFriendlyTerritory(getTeam())))
+		{
+			// Super Forts begin *bombard*
+			iModifier += GC.getImprovementInfo(eImprovement).getDefenseModifier() - getDefenseDamage();
+		}
 	}
 
 	if (!bHelp)
 	{
 		const CvCity* pCity = getPlotCity();
 
-		if (pCity != NULL)
+		if (pCity)
 		{
 			iModifier += pCity->getDefenseModifier(bIgnoreBuilding);
 		}
@@ -4747,7 +4754,7 @@ bool CvPlot::isRevealedGoody(TeamTypes eTeam) const
 		return false;
 	}
 
-	return ((getRevealedImprovementType(eTeam, false) == NO_IMPROVEMENT) ? false : GC.getImprovementInfo(getRevealedImprovementType(eTeam, false)).isGoody());
+	return ((getRevealedImprovementType(eTeam) == NO_IMPROVEMENT) ? false : GC.getImprovementInfo(getRevealedImprovementType(eTeam)).isGoody());
 }
 
 
@@ -7893,7 +7900,7 @@ int CvPlot::calculateYield(YieldTypes eYield, bool bDisplay) const
 
 		if (bDisplay)
 		{
-			eImprovement = getRevealedImprovementType(GC.getGame().getActiveTeam(), false);
+			eImprovement = getRevealedImprovementType(GC.getGame().getActiveTeam());
 			eRoute = getRevealedRouteType(GC.getGame().getActiveTeam(), false);
 		}
 		else
@@ -9227,17 +9234,17 @@ void CvPlot::setRevealed(const TeamTypes eTeam, const bool bNewValue, const bool
 		{
 			if (getRevealedOwner(eFromTeam, false) == getOwner())
 			{
-				setRevealedOwner(eTeam, getRevealedOwner(eFromTeam, false));
+				setRevealedOwner(eTeam, getOwner());
 			}
 
-			if (getRevealedImprovementType(eFromTeam, false) == getImprovementType())
+			if (getRevealedImprovementType(eFromTeam) == getImprovementType())
 			{
-				setRevealedImprovementType(eTeam, getRevealedImprovementType(eFromTeam, false));
+				setRevealedImprovementType(eTeam, getImprovementType());
 			}
 
 			if (getRevealedRouteType(eFromTeam, false) == getRouteType())
 			{
-				setRevealedRouteType(eTeam, getRevealedRouteType(eFromTeam, false));
+				setRevealedRouteType(eTeam, getRouteType());
 			}
 
 			if (pCity != NULL && pCity->isRevealed(eFromTeam, false))
@@ -9282,7 +9289,7 @@ void CvPlot::setRevealedImprovementType(TeamTypes eTeam, ImprovementTypes eNewVa
 	PROFILE_EXTRA_FUNC();
 	FASSERT_BOUNDS(0, MAX_TEAMS, eTeam);
 
-	if (getRevealedImprovementType(eTeam, false) != eNewValue)
+	if (getRevealedImprovementType(eTeam) != eNewValue)
 	{
 		if (NULL == m_aeRevealedImprovementType)
 		{
@@ -9803,7 +9810,7 @@ void CvPlot::updateFlagSymbol()
 	PlayerTypes ePlayer = NO_PLAYER;
 	PlayerTypes ePlayerOffset = NO_PLAYER;
 
-	CvUnit* pCenterUnit = getCenterUnit(false);
+	CvUnit* pCenterUnit = getCenterUnit(GC.getGame().isDebugMode());
 
 	//get the plot's unit's flag
 	//The plot check is to account for units in the delayed-death cycle
@@ -9926,6 +9933,11 @@ void CvPlot::updateCenterUnit()
 		return;
 	}
 	CvUnit* newCenterUnit = isActiveVisible(true) ? getPreferredCenterUnit() : NULL;
+	if (!newCenterUnit && gDLL->GetWorldBuilderMode())
+	{
+		const CLLNode<IDInfo>* pUnitNode = headUnitNode();
+		newCenterUnit = pUnitNode ? ::getUnit(pUnitNode->m_data) : NULL;
+	}
 
 	if (newCenterUnit != m_pCenterUnit)
 	{
@@ -10512,9 +10524,10 @@ ColorTypes CvPlot::plotMinimapColor() const
 				return (ColorTypes) GC.getInfoTypeForString("COLOR_WHITE");
 			}
 		}
+
 		if (isActiveVisible(true))
 		{
-			const CvUnit* pCenterUnit = getCenterUnit(true);
+			const CvUnit* pCenterUnit = getCenterUnit(GC.getGame().isDebugMode());
 
 			if (pCenterUnit)
 			{

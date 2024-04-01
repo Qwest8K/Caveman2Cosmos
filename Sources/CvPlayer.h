@@ -802,8 +802,7 @@ public:
 
 	DllExport bool isAlive() const;
 	bool isEverAlive() const;
-	void setAlive(bool bNewValue);
-	void setNewPlayerAlive(bool bNewValue);
+	void setAlive(bool bNewValue, bool bActivateTurn = true);
 	void verifyAlive();
 
 	DllExport bool isTurnActive() const;
@@ -818,6 +817,7 @@ public:
 
 	bool isEndTurn() const { return m_bEndTurn; }
 	DllExport void setEndTurn(bool bNewValue);
+	void changeEndTurn(const bool bNewValue, const bool bForce = false);
 
 	bool isForcedCityCycle() const;
 	void setForcedCityCycle(const bool bNewValue) { m_bForcedCityCycle = bNewValue; }

@@ -60,7 +60,7 @@ class MapConstants:
 
 		#This variable adjusts the amount of bonuses on the map. Values above 1.0 will add bonus bonuses.
 		#People often want lots of bonuses, and for those people, this variable is definately a bonus.
-		self.fBonusMult = 0.8
+		self.fBonusMult = 1.0
 
 		# fRiverThreshold is used to decide if enough water has accumulated to form a river.
 		# A lower value creates more rivers over the entire map. It controls lenght, complexity and density of rivers.
@@ -86,6 +86,9 @@ class MapConstants:
 		# This value sets the relative minimum altitude of lake depressions. It Should be between 0 and 1.
 		# It is relative to fLandHeight. A value of zero means that lakes can appear as low as the maximum ocean height.
 		self.fRelMinLakeAlt = 0.1
+
+		# How circular lakes are. 0 generates only circular lakes, 1 will make them run toward low elevation only
+		self.fLakeEccentricity = 0.25
 
 		#The percent chance that a floodplain may appear on a valid riverside.
 		self.fFloodplainChance = 0.5
@@ -168,11 +171,12 @@ class MapConstants:
 		##############################################################################
 		''' These are values that affect the elevation map,
 		higher numbers give greater chaos and smaller features.'''
-		self.fBaseFreq = 0.46
-		self.fLacunarity = 1.58
+		self.fBaseFreq = 0.44
+		self.fLacunarity = 1.61
 		# Roughness boundaries; range: 0-1.
-		self.fMinPersi = 0.6
-		self.fMaxPersi = 0.8
+		self.fPersFreq = self.fBaseFreq*4
+		self.fMinPersi = 0.60
+		self.fMaxPersi = 0.92
 		''' They are tricky variables, tweaking them is not easy, nor predictable.'''
 
 		# These set the water temperature compression that creates the land/sea seasonal temperature differences that cause monsoon winds.
@@ -201,9 +205,9 @@ class MapConstants:
 		# These attenuation factors lower the altitude of the map edges. Value between 0 an 1.
 		# Low factor means strong attenuation at the edge, attenuation dissipates for each plot in the range.
 		# This is currently used to prevent large continents in the uninhabitable polar regions.
-		self.northAttenuationFactor = .40
-		self.northAttenuationRange	= .06
-		self.southAttenuationFactor = .80
+		self.northAttenuationFactor = .85
+		self.northAttenuationRange	= .16
+		self.southAttenuationFactor = .85
 		self.southAttenuationRange	= .16
 		# East/west attenuation is set to zero, but modded maps may have need for them.east west attenuation may be desired for flat maps.
 		self.eastAttenuationFactor	= .0
@@ -278,23 +282,29 @@ class MapConstants:
 			self.bAttenuate = False
 		elif selectionID == 1:
 			self.bPangea = True
-			self.fBaseFreq *= 0.76
+			self.fBaseFreq *= 0.7
+			self.fLacunarity *= 1.2
 			self.northAttenuationFactor	= .2
-			self.northAttenuationRange	= .16
+			self.northAttenuationRange	= .25
 			self.southAttenuationFactor	= .2
-			self.southAttenuationRange	= .16
+			self.southAttenuationRange	= .25
 			self.eastAttenuationFactor	= .2
-			self.eastAttenuationRange	= .24
+			self.eastAttenuationRange	= .4
 			self.westAttenuationFactor	= .2
-			self.westAttenuationRange	= .24
+			self.westAttenuationRange	= .4
 		elif selectionID == 2:
 			self.bEarthlike = True
 		elif selectionID == 3:
 			self.bArchipelago = True
-			self.fBaseFreq *=  1.8
-			self.PeakPercent *= 0.7
+			self.bAttenuate = False
+			self.fBaseFreq *= 2
+			self.fPersFreq *= 2
+			self.fLacunarity *= 3
+			self.fMinPersi = 0.5
+			self.fMaxPersi = 0.88
+			self.PeakPercent *= 0.8
 		else:
-			self.PeakPercent *= 0.7
+			self.PeakPercent *= 0.6
 			self.bWaterworld = True
 		# Wrap Options
 		self.bWrapX = True
@@ -302,18 +312,10 @@ class MapConstants:
 		selectionID = MAP.getCustomMapOption(3)
 		if not selectionID:
 			wrapString = "Cylindrical"
-			if self.bPangea:
-				self.eastAttenuationRange	= .30
-				self.westAttenuationRange	= .30
 		elif selectionID == 1:
 			wrapString = "Toroidal"
 			self.bWrapY = True
-			if self.bPangea:
-				self.northAttenuationRange	= .20
-				self.southAttenuationRange	= .20
-				self.eastAttenuationRange	= .30
-				self.westAttenuationRange	= .30
-			else:
+			if not self.bPangea or not self.bWaterworld:
 				self.bAttenuate = False
 		elif selectionID == 2:
 			wrapString = "Flat"
@@ -350,15 +352,19 @@ class MapConstants:
 		if not selectionID:
 			self.fBonusMult = 0.0
 		elif selectionID == 1:
-			self.fBonusMult *= 0.50
+			self.fBonusMult *= 0.2
 		elif selectionID == 2:
-			self.fBonusMult *= 0.75
+			self.fBonusMult *= 0.4
+		elif selectionID == 3:
+			self.fBonusMult *= 0.6
 		elif selectionID == 4:
-			self.fBonusMult *= 1.25
-		elif selectionID == 5:
-			self.fBonusMult *= 1.50
+			self.fBonusMult *= 0.8
 		elif selectionID == 6:
-			self.fBonusMult *= 1.75
+			self.fBonusMult *= 1.2
+		elif selectionID == 7:
+			self.fBonusMult *= 1.4
+		elif selectionID == 8:
+			self.fBonusMult *= 1.6
 		# Pangea Breaker
 		selectionID = MAP.getCustomMapOption(7)
 		if selectionID or self.bDryland or self.bPangea:
@@ -455,43 +461,58 @@ class MapConstants:
 		# fMaxStartLat limits the starting location to a maximum latitude.
 		self.fMaxStartLat = 90 * self.fPolarLat - self.fPolarLat**3 / 0.0569
 		# Sea Level
-		seaLevel = GC.getSeaLevelInfo(MAP.getSeaLevel()).getSeaLevelChange()
+		seaLevel = MAP.getSeaLevel()
 		if self.bEarthlike:
 			if not seaLevel:
-				self.fLandPercent = .3
-			elif seaLevel > 0:
-				self.fLandPercent = .25
+				self.fLandPercent = .38 # Very Low
+			elif seaLevel == 1:
+				self.fLandPercent = .34 # Low
+			elif seaLevel == 2:
+				self.fLandPercent = .30 # Normal
 			else:
-				self.fLandPercent = .35
+				self.fLandPercent = .26 # High
+
 		elif self.bArchipelago:
 			if not seaLevel:
-				self.fLandPercent = .25
-			elif seaLevel > 0:
-				self.fLandPercent = .2
+				self.fLandPercent = .35 # Very Low
+			elif seaLevel == 1:
+				self.fLandPercent = .30 # Low
+			elif seaLevel == 2:
+				self.fLandPercent = .25 # Normal
 			else:
-				self.fLandPercent = .3
+				self.fLandPercent = .20 # High
+
 		elif self.bWaterworld:
 			if not seaLevel:
-				self.fLandPercent = .15
-			elif seaLevel > 0:
-				self.fLandPercent = .1
+				self.fLandPercent = .22 # Very Low
+			elif seaLevel == 1:
+				self.fLandPercent = .20 # Low
+			elif seaLevel == 2:
+				self.fLandPercent = .18 # Normal
 			else:
-				self.fLandPercent = .2
+				self.fLandPercent = .16 # High
+
 		elif self.bDryland:
 			if not seaLevel:
-				self.fLandPercent = .85
-			elif seaLevel > 0:
-				self.fLandPercent = .7
+				self.fLandPercent = 1.0 # Very Low
+			elif seaLevel == 1:
+				self.fLandPercent = .90 # Low
+			elif seaLevel == 2:
+				self.fLandPercent = .80 # Normal
 			else:
-				self.fLandPercent = 1.0
+				self.fLandPercent = .70 # High
+
 		elif self.bPangea:
 			if not seaLevel:
-				self.fLandPercent = .45
-			elif seaLevel > 0:
-				self.fLandPercent = .35
+				self.fLandPercent = .60 # Very Low
+			elif seaLevel == 1:
+				self.fLandPercent = .50 # Low
+			elif seaLevel == 2:
+				self.fLandPercent = .40 # Normal
 			else:
-				self.fLandPercent = .55
-		print "Land percent = %f" % self.fLandPercent
+				self.fLandPercent = .30 # High
+
+		print "SEALEVEL %d | Land percent = %f" % (seaLevel, self.fLandPercent)
 
 mc = None
 
@@ -1068,13 +1089,11 @@ class ElevationMap(FloatMap):
 		bWrapX = mc.bWrapX
 		bAttenuate = mc.bAttenuate
 		fLandPercent = mc.fLandPercent
-		iSampling0 = mc.iWorldSize + 1
-		iSampling1 = iSampling0
 		fBaseFreq = mc.fBaseFreq
 		fBaseFreq1 = fBaseFreq*6
 		fLacunarity = mc.fLacunarity
 		# Roughness oscillation.
-		fPersFreq = fBaseFreq*6
+		fPersFreq = mc.fPersFreq
 		fMinPersi = mc.fMinPersi
 		fMaxPersi = mc.fMaxPersi
 		# Noise Maps
@@ -1091,16 +1110,17 @@ class ElevationMap(FloatMap):
 				xP = 1.0 * x/iWidthLoc
 				c1 = cos(xP * 2*pi)*1.1 + 4
 				c3 = sin(xP * 2*pi)*1.1 + 2
-				fPersistence = fPersiNoise.fBm(c1, c2, c3, c4, 6, fPersFreq, 1.2, .6, .5, 2.6, fMinPersi, fMaxPersi)
+				fPersistence = fPersiNoise.fBm(c1, c2, c3, c4, 6, fPersFreq, 1.1, .6, .5, 2.6, fMinPersi, fMaxPersi)
 				self.data[i] = heightNoise.fBm(c1, c2, c3, c4, 12, fBaseFreq, fLacunarity, fMinPersi, fPersistence)
-				if self.data[i] > 0.75:
-					self.data[i] -= detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
-				elif self.data[i] > 0.5:
-					self.data[i] += detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
-				elif self.data[i] > 0.25:
-					self.data[i] -= detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
-				else:
-					self.data[i] += detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
+				if not mc.bArchipelago:
+					if self.data[i] > 0.75:
+						self.data[i] -= detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
+					elif self.data[i] > 0.5:
+						self.data[i] += detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
+					elif self.data[i] > 0.25:
+						self.data[i] -= detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
+					else:
+						self.data[i] += detailNoise.fBm(c1, c2, c3, c4, 6, fBaseFreq1, 1.4, .5, .6, 3, .0, .2)
 		self.Normalize()
 		if bAttenuate:
 			print "	Attenuating"
@@ -2247,6 +2267,7 @@ class LakeMap:
 					return 0
 		# Create the lake.
 		relAltMap = em.relAltMap3x3
+		lakeCenter = [x, y]
 		thisLake = []
 		lakeNeighbors = []
 		checkedPlots = []
@@ -2295,7 +2316,11 @@ class LakeMap:
 					if bValid:
 						lakeNeighbors.append(LakePlot(x, y, i, relAltMap[i], iMergeSize))
 			if len(lakeNeighbors) > 1:
-				lakeNeighbors.sort(lambda a, b:cmp(a.fHeight, b.fHeight))
+				# Should weigh by current center-of-lake instead of start, but this'll work for now
+				# Plot distance (1 - > 5ish) recriprocated (1 - > 0.2ish), then flipped by 1 (0 -> 0.8ish) & 4x downscaled (0 -> 0.2ish) matches height (0.01 to 0.2ish)
+				lakeNeighbors.sort(lambda a, b:cmp(
+					(mc.fLakeEccentricity * a.fHeight + (1 - mc.fLakeEccentricity) * (1 - 1 / max(1, plotDistance(a.x, a.y, lakeCenter[0], lakeCenter[1]))) / 4),
+					(mc.fLakeEccentricity * b.fHeight + (1 - mc.fLakeEccentricity) * (1 - 1 / max(1, plotDistance(b.x, b.y, lakeCenter[0], lakeCenter[1]))) / 4)))
 			while True:
 				if len(lakeNeighbors) == 0:
 					return 1
@@ -2987,6 +3012,7 @@ class BonusPlacer:
 		iWorldSize = mc.iWorldSize
 		fBonusMult = mc.fBonusMult
 		self.aBonusList = bonusList = []
+		self.iPass = 1
 		# Create and shuffle the bonus list.
 		n = 0
 		pOrderDict = {}
@@ -3062,17 +3088,35 @@ class BonusPlacer:
 				shufflePyList(placementList, mapRand)
 				for indeXML in placementList:
 					startAtIndex = self.AddBonusType(indeXML, plotIndexList, startAtIndex, iWorldSize)
-		# Now check to see that all resources have been placed at least once while ignoring area rules.
+		# Second pass where we do not scale unique spacing range between resources
+		self.iPass = 2
+		for iOrder, aList in pOrderList:
+			placementList = []
+			for indeXML in aList:
+				for n in xrange(bonusList[bonusDictLoc[indeXML]].desiredBonusCount - bonusList[bonusDictLoc[indeXML]].currentBonusCount):
+					placementList.append(indeXML)
+			if placementList:
+				shufflePyList(placementList, mapRand)
+				for indeXML in placementList:
+					startAtIndex = self.AddBonusType(indeXML, plotIndexList, startAtIndex, iWorldSize)
+		# Third pass that ignores area rules and class spacing entirely.
+		self.iPass = 3
+		for iOrder, aList in pOrderList:
+			placementList = []
+			for indeXML in aList:
+				if (
+					bonusList[bonusDictLoc[indeXML]].currentBonusCount == 0
+				and bonusList[bonusDictLoc[indeXML]].desiredBonusCount > 0
+				):
+					placementList.append(indeXML)
+			if placementList:
+				shufflePyList(placementList, mapRand)
+				for indeXML in placementList:
+					startAtIndex = self.AddBonusType(indeXML, plotIndexList, startAtIndex, iWorldSize)
 		for i in xrange(iNumBonuses):
 			bonus = bonusList[i]
 			if bonus.currentBonusCount == 0 and bonus.desiredBonusCount > 0:
-				startAtIndex = self.AddEmergencyBonus(bonus, False, plotIndexList, startAtIndex)
-		#now check again to see that all resources have been placed at least once,
-		#this time ignoring area rules and also class spacing
-		for i in xrange(iNumBonuses):
-			bonus = bonusList[i]
-			if bonus.currentBonusCount == 0 and bonus.desiredBonusCount > 0:
-				startAtIndex = self.AddEmergencyBonus(bonus, True, plotIndexList, startAtIndex)
+				startAtIndex = self.AddEmergencyBonus(bonus, plotIndexList, startAtIndex)
 		#now report resources that simply could not be placed
 		for iOrder, aList in pOrderList:
 			for indeXML in aList:
@@ -3108,6 +3152,8 @@ class BonusPlacer:
 			# Place bonus
 			CyPlot.setBonusType(indeXML)
 			bonus.currentBonusCount += 1
+			if self.iPass > 1: # No clustering for second pass
+				break
 			# Clustering
 			iGroupRange = bonusInfo.getGroupRange()
 			if iGroupRange < 1: break
@@ -3129,7 +3175,7 @@ class BonusPlacer:
 			for dx in xrange(-iGroupRange, iGroupRange + 1):
 				for dy in xrange(-iGroupRange, iGroupRange + 1):
 					CyPlotX = self.plotXY(x, y, dx, dy)
-					if CyPlotX and GAME.getSorenRandNum(100, "0-99") < iRand and self.PlotCanHaveBonus(CyPlotX, indeXML, False):
+					if CyPlotX and GAME.getSorenRandNum(100, "0-99") < iRand and self.PlotCanHaveBonus(CyPlotX, indeXML):
 						#place bonus
 						CyPlotX.setBonusType(indeXML)
 						bonus.currentBonusCount += 1
@@ -3144,7 +3190,7 @@ class BonusPlacer:
 
 
 	#AIAndy - Changed to start at the end of the last run in the plot list and not shuffle an extra plot list
-	def AddEmergencyBonus(self, bonus, ignoreClass, plotIndexList, startAtIndex):
+	def AddEmergencyBonus(self, bonus, plotIndexList, startAtIndex):
 		GC = CyGlobalContext()
 		MAP = GC.getMap()
 		bonusInfo = GC.getBonusInfo(bonus.indeXML)
@@ -3160,7 +3206,7 @@ class BonusPlacer:
 				index = plotIndexList[i]
 			plot = MAP.plotByIndex(index)
 
-			if ignoreClass and self.PlotCanHaveBonus(plot, bonus.indeXML, True) or self.CanPlaceBonus(plot, bonus.indeXML, True):
+			if self.CanPlaceBonus(plot, bonus.indeXML, True):
 				#temporarily remove any feature
 				featureEnum = plot.getFeatureType()
 				if featureEnum == featureForest:
@@ -3208,10 +3254,11 @@ class BonusPlacer:
 		iBonusClass = bonusInfo.getBonusClassType()
 		classInfo = GC.getBonusClassInfo(iBonusClass)
 		iRange0 = 0
-		if classInfo:
+		if classInfo and self.iPass < 3:
 			iRange0 = classInfo.getUniqueRange()
 			if iRange0 > 0:
-				iRange0 += (mc.iWorldSize + 1) / 2
+				if self.iPass == 1:
+					iRange0 += (mc.iWorldSize + 1) / 2
 				for dx in xrange(-iRange0, iRange0 + 1):
 					for dy in xrange(-iRange0, iRange0 + 1):
 						if dx or dy:
@@ -3225,7 +3272,8 @@ class BonusPlacer:
 		#Make sure there are no bonuses of the same type nearby:
 		iRange1 = bonusInfo.getUniqueRange()
 		if iRange1 > 0:
-			iRange1 += mc.iWorldSize
+			if self.iPass == 1:
+				iRange1 += mc.iWorldSize
 			if iRange1 > iRange0:
 				for dx in xrange(-iRange1, iRange1 + 1):
 					for dy in xrange(-iRange1, iRange1 + 1):
@@ -3236,7 +3284,7 @@ class BonusPlacer:
 		return True
 
 
-	def PlotCanHaveBonus(self, plot, indeXML, bIgnoreArea, bFree = True):
+	def PlotCanHaveBonus(self, plot, indeXML, bIgnoreArea = False, bFree = True):
 		#This function is like CvPlot::canHaveBonus but will ignore blocking features and checks for a valid area.
 		if bFree and plot.getBonusType(TeamTypes.NO_TEAM) != BonusTypes.NO_BONUS:
 			return False
@@ -3339,7 +3387,7 @@ class BonusPlacer:
 		iPossible = 0
 		for i in xrange(mc.iArea):
 			plot = MAP.plotByIndex(i)
-			if plot.getArea() == areaID and self.PlotCanHaveBonus(plot, indeXML, True):
+			if plot.getArea() == areaID and self.PlotCanHaveBonus(plot, indeXML, True, False):
 				iPossible += 1
 
 		iPossible /= uniqueTypesInArea + sameClassTypesInArea + 1
@@ -3693,7 +3741,7 @@ class StartingPlotFinder:
 					iTech = CvBonusInfo.getTechReveal()
 					if iTech != -1 and GC.getTechInfo(iTech).getEra() > startEra:
 						continue
-					if not bp.PlotCanHaveBonus(CyPlot, bonusEnum, False) and not bp.PlotCanHaveBonus(CyPlot, bonusEnum, True):
+					if not bp.PlotCanHaveBonus(CyPlot, bonusEnum):
 						continue
 					CyPlot.setBonusType(bonusEnum)
 					bonusCount += 1
@@ -3879,7 +3927,6 @@ class StartPlot:
 ##############################################################################
 class MapOptions:
 	def __init__(self):
-		self.bfirstRun = True
 		self.optionList = \
 		[	# Title, Default, Random, Choices
 			["Hills:",			2,	True, 5],
@@ -3888,12 +3935,10 @@ class MapOptions:
 			["World Wrap:",		0, False, 3],
 			["Start:",			1, False, 2],
 			["Rivers:",			4,	True, 9],
-			["Resources:",		3,	True, 7],
+			["Resources:",		5,	True, 9],
 			["Pangea Breaker:",	0, False, 2]
 		] # When adding/removing options: Update the return of getNumCustomMapOptions().
 
-	def loadMapOptionDefaults(self):
-		self.bfirstRun = False
 		fileName = os.path.join(self.civFilePath(),"World_MapDefaults.cfg")
 		try:
 			settings = open(fileName, 'r')
@@ -3910,6 +3955,10 @@ class MapOptions:
 
 
 	def saveMapOptionDefaults(self):
+		# Register selected options
+		for i in xrange(len(self.optionList)):
+			self.optionList[i][1] = int(CyGlobalContext().getMap().getCustomMapOption(i))
+
 		fileName = os.path.join(self.civFilePath(),"World_MapDefaults.cfg")
 		try:
 			settings = open(fileName, 'w')
@@ -3939,6 +3988,7 @@ class MapOptions:
 		except:
 			return ""
 
+	'''
 	def regRead(self, registry, path, field):
 		try:
 			pathKey = _winreg.OpenKey(registry, path)
@@ -3946,6 +3996,7 @@ class MapOptions:
 			return fieldValue[0]
 		finally:
 			pathKey.Close()
+	'''
 
 mo = MapOptions()
 
@@ -3955,9 +4006,6 @@ mo = MapOptions()
 ##############################################################################
 
 def isAdvancedMap():
-	if mo.bfirstRun:
-		print "Preparing World Map Script"
-		mo.loadMapOptionDefaults()
 	return False
 
 def getNumHiddenCustomMapOptions():
@@ -3979,13 +4027,7 @@ def isRandomCustomMapOption(argsList):
 	return mo.optionList[argsList[0]][2]
 
 def getCustomMapOptionDescAt(argsList):
-	# Register selected options
 	optionList = mo.optionList
-	if not mo.bfirstRun:
-		for i in xrange(len(optionList)):
-			iDefault = int(CyGlobalContext().getMap().getCustomMapOption(i))
-			optionList[i][1] = iDefault
-		mo.optionList = optionList
 	# Return names of option alternatives.
 	optionID	= argsList[0]
 	selectionID = argsList[1]
@@ -4066,17 +4108,21 @@ def getCustomMapOptionDescAt(argsList):
 		if selectionID == 0:
 			return "None"
 		if selectionID == 1:
-			return "50%"
+			return "20%"
 		if selectionID == 2:
-			return "75%"
+			return "40%"
 		if selectionID == 3:
-			return "100%"
+			return "60%"
 		if selectionID == 4:
-			return "125%"
+			return "80%"
 		if selectionID == 5:
-			return "150%"
+			return "100%"
 		if selectionID == 6:
-			return "175%"
+			return "120%"
+		if selectionID == 7:
+			return "140%"
+		if selectionID == 8:
+			return "160%"
 	# Pangea Breaker
 	if optionID == 7:
 		if selectionID == 0: # On
@@ -4167,17 +4213,21 @@ def beforeInit():
 	if optionList[6][1] == 0:
 		print "	%s		None" % optionList[6][0]
 	elif optionList[6][1] == 1:
-		print "	%s		50 percent" % optionList[6][0]
+		print "	%s		20 percent" % optionList[6][0]
 	elif optionList[6][1] == 2:
-		print "	%s		75 percent" % optionList[6][0]
+		print "	%s		40 percent" % optionList[6][0]
 	elif optionList[6][1] == 3:
-		print "	%s		100 percent" % optionList[6][0]
+		print "	%s		60 percent" % optionList[6][0]
 	elif optionList[6][1] == 4:
-		print "	%s		125 percent" % optionList[6][0]
+		print "	%s		80 percent" % optionList[6][0]
 	elif optionList[6][1] == 5:
-		print "	%s		150 percent" % optionList[6][0]
+		print "	%s		100 percent" % optionList[6][0]
 	elif optionList[6][1] == 6:
-		print "	%s		175 percent" % optionList[6][0]
+		print "	%s		120 percent" % optionList[6][0]
+	elif optionList[6][1] == 7:
+		print "	%s		140 percent" % optionList[6][0]
+	elif optionList[6][1] == 8:
+		print "	%s		160 percent" % optionList[6][0]
 	# Pangea Breaker
 	if optionList[2][1] == 0 or optionList[2][1] == 1:
 		print "	%s	Off (Dryland|Pangea)" % optionList[7][0]

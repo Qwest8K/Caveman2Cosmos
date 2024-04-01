@@ -388,12 +388,12 @@ def canTriggerBabyBoom(argsList):
 def applyBardTale3(argsList):
 	data = argsList[1]
 	player = GC.getPlayer(data.ePlayer)
-	player.changeGold(-10 * player.getNumCities())
+	player.changeGold(-50 * player.getNumCities())
 
 def canApplyBardTale3(argsList):
 	data = argsList[1]
 	player = GC.getPlayer(data.ePlayer)
-	if player.getGold() - 10 * player.getNumCities() < 0:
+	if player.getGold() - 50 * player.getNumCities() < 0:
 		return False
 	return True
 
@@ -401,7 +401,7 @@ def canApplyBardTale3(argsList):
 def getHelpBardTale3(argsList):
 	data = argsList[1]
 	player = GC.getPlayer(data.ePlayer)
-	return TRNSLTR.getText("TXT_KEY_EVENT_GOLD_LOST", (10 * player.getNumCities(), ))
+	return TRNSLTR.getText("TXT_KEY_EVENT_GOLD_LOST", (50 * player.getNumCities(), ))
 
 ######## LOOTERS ###########
 
@@ -478,6 +478,8 @@ def canTriggerBrothersInNeed(argsList):
 
   listResources = []
   listResources.append(GC.getInfoTypeForString("BONUS_COPPER_ORE"))
+  listResources.append(GC.getInfoTypeForString("BONUS_OBSIDIAN"))
+  listResources.append(GC.getInfoTypeForString("BONUS_STONE"))
   listResources.append(GC.getInfoTypeForString("BONUS_IRON_ORE"))
   listResources.append(GC.getInfoTypeForString("BONUS_HORSE"))
   listResources.append(GC.getInfoTypeForString("BONUS_ELEPHANTS"))
@@ -6156,7 +6158,7 @@ def doVolcanoNeighbouringPlots(pPlot):
 			if iImprovement != -1 and not plotX.isCity() and not iImprovement in immuneImprovements:
 				if iPlayer > -1:
 					szBuffer = TRNSLTR.getText("TXT_KEY_EVENT_CITY_IMPROVEMENT_DESTROYED_NOOWNER", (GC.getImprovementInfo(iImprovement).getTextKey(), ))
-					CyInterface().addMessage(iPlayer, False, GC.getEVENT_MESSAGE_TIME(), szBuffer, "AS2D_BOMBARDED", InterfaceMessageTypes.MESSAGE_TYPE_INFO, GC.getImprovementInfo(iImprovement).getButton(), GC.getCOLOR_RED(), plot.getX(), plot.getY(), True, True)
+					CyInterface().addMessage(iPlayer, False, GC.getEVENT_MESSAGE_TIME(), szBuffer, "AS2D_BOMBARDED", InterfaceMessageTypes.MESSAGE_TYPE_INFO, GC.getImprovementInfo(iImprovement).getButton(), GC.getCOLOR_RED(), plotX.getX(), plotX.getY(), True, True)
 				if iImprovement in listRuins:
 					plotX.setImprovementType(iRuins)
 				else:
@@ -6329,6 +6331,26 @@ def getHelpVolcanoExtinction(argsList):
 
 ### Fire events for C2C
 
+def doWildFire(argsList):
+	data = argsList[1]
+	CyPlayer = GC.getPlayer(data.ePlayer)
+	CyCity = CyPlayer.getCity(data.iCityId)
+
+	validHousesList = []
+	for i in range(GC.getNumBuildingInfos()):
+		if isLimitedWonder(i) or not CyCity.hasBuilding(i) or CyCity.isFreeBuilding(i):
+			continue
+		info = GC.getBuildingInfo(i)
+		if info.getProductionCost() < 1 or info.isNukeImmune() or info.isAutoBuild():
+			continue
+		validHousesList.append(i)
+
+	if validHousesList:
+		iBuilding = validHousesList[GAME.getSorenRandNum(len(validHousesList), "Wildfire")]
+		szBuffer = TRNSLTR.getText("TXT_KEY_EVENT_CITY_IMPROVEMENT_DESTROYED", (GC.getBuildingInfo(iBuilding).getTextKey(), ))
+		CyInterface().addMessage(data.ePlayer, False, GC.getEVENT_MESSAGE_TIME(), szBuffer, "AS2D_BOMBARDED", InterfaceMessageTypes.MESSAGE_TYPE_INFO, GC.getBuildingInfo(iBuilding).getButton(), GC.getCOLOR_RED(), CyCity.getX(), CyCity.getY(), True, True)
+		CyCity.changeHasBuilding(iBuilding, False)
+
 def doMinorFire(argsList):
 	data = argsList[1]
 	CyPlayer = GC.getPlayer(data.ePlayer)
@@ -6448,6 +6470,8 @@ def doCatastrophicFire(argsList):
 			CyInterface().addMessage(data.ePlayer, False, GC.getEVENT_MESSAGE_TIME(), szBuffer, "AS2D_BOMBARDED", InterfaceMessageTypes.MESSAGE_TYPE_INFO, GC.getBuildingInfo(iBurnBuilding).getButton(), GC.getCOLOR_RED(), CyCity.getX(), CyCity.getY(), True, True)
 			CyCity.changeHasBuilding(iBurnBuilding, False)
 
+def getHelpWildFire(argsList):
+  return TRNSLTR.getText("TXT_KEY_EVENT_WILDFIRE_1_HELP",())
 
 def getHelpMinorFire(argsList):
   return TRNSLTR.getText("TXT_KEY_EVENT_FIRE_MINOR_1_HELP",())
